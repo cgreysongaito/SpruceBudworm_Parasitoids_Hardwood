@@ -47,7 +47,7 @@ library(sjstats)
 # Data Input and Cleaning -----------------------------------------------------------
 
 ## 1980s Malaise Samples - Stable Isotope
-malcatfol <- read_csv("data/SIdataChrisGreysonGaito2017.csv")%>%
+malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
   mutate(DummyIdent=Identifier, DummyIdent=gsub(" A| B| C","",DummyIdent))%>% #remove A B C to prep for find average values of repeats of a few samples
   group_by(DummyIdent)%>% # set up averaging by group by a dummy identifier
   summarise(d13C=mean(cald13C), percentC=mean(calpercentC), d15N=mean(cald15N), percentN=mean(calpercentN), CNRatio=mean(CNratio))%>% #find the average values of the repeats of a few samples and return the same values of the other samples that did not have SI repeats
@@ -102,20 +102,20 @@ malcatfol <- read_csv("data/SIdataChrisGreysonGaito2017.csv")%>%
   )))
 
 ## 2015, 2016, 2017 reared caterpillars and parasitoids count
-allyrsreared <- read_csv("data/allyrsreareddata.csv") %>%
+allyrsreared <- read_csv("data/reared_caterpillarparasitoid_countdata_GreysonGaitoetal2021.csv") %>%
   mutate(percappara = NoParasitoidsSBW/NoSBWReared)
 
 ## 2016 malaise caught parasitoids plus 2015 reared parasitoids (that were DNA barcoded)
-ASSBW_ASBNAmetadata <- read_csv("data/ASSBW&ASBNA.csv") %>%
+ASSBW_ASBNAmetadata <- read_csv("data/malaise2016_reared2015_barcoded_metadata_GreysonGaitoetal2021.csv") %>%
   select(ProcessID, SampleID, HWGrad, Plot, Method, CONTIG, BIN)
 
-ASSBW_ASBNAphy <- read.tree("data/ASSBW&ASBNA.nwk")
+ASSBW_ASBNAphy <- read.tree("data/malaise2016_reared2015_barcoded_tree_GreysonGaitoetal2021.nwk")
 
 ## 1980s reared parasitoids (that were DNA barcoded)
-ASSPP_ASSPQmetadata <- read_csv("data/ASSPP&ASSPQ.csv") %>%
+ASSPP_ASSPQmetadata <- read_csv("data/reared1980s_barcoded_metadata_GreysonGaitoetal2021.csv") %>%
   separate(CollectionNotes, c("Plot", "Composition"), sep="_", remove=FALSE)
 
-ASSPP_ASSPQphy <- read.tree("data/ASSPP&ASSPQ.nwk")
+ASSPP_ASSPQphy <- read.tree("data/reared1980s_barcoded_tree_GreysonGaitoetal2021.nwk")
 
 
 # Alternating hardwood-softwood parasitoids hypothesis  --------
