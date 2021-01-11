@@ -20,7 +20,7 @@ Christopher J. Greyson-Gaito<sup>*1</sup>, Sarah J. Dolson<sup>2</sup>, Glen For
 * MAS &ndash; 0000-0002-8650-2575
 * ESE &ndash; 0000-0001-5060-8565
 
-[![DOI](https://zenodo.org/badge/DOI/10./zenodo..svg)](https://doi.org/10./zenodo.)
+[![DOI](https://zenodo.org/badge/4432484.svg)](https://doi.org/10.5281/zenodo.4432484)
 
 ## Dataset and  R script containing statistical analysis/figure creation.
 
