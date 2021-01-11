@@ -81,14 +81,13 @@ malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
     grepl("JULY",Identifier) | grepl("AUG",Identifier)  ~ "SBWGONE"
   )))%>%
   mutate(FunctionalTrophicPosition=as.factor(case_when(
-    grepl("BFP",Identifier) | grepl("HWP",Identifier) | grepl("WRAUG",Identifier) | grepl("RHOAUG",Identifier) ~ "Foliage",
+    grepl("BFP",Identifier) | grepl("HWP",Identifier) ~ "Foliage",
     grepl("ALT",Identifier) | grepl("SBW", Identifier) ~ "Caterpillar",
     grepl("GR", Identifier) ~ "Parasitoid"
   )))%>%
   mutate(TreeType=as.factor(case_when(
     grepl("BF", Identifier) ~ "BF",
     grepl("HW", Identifier) ~ "HW",
-    grepl("WRAUG",Identifier) | grepl("RHOAUG",Identifier) ~ "Shrub"
   )))%>%
   mutate(SBWALT=as.factor(case_when(
     grepl("SBW", Identifier) ~ "SBW",
@@ -103,7 +102,7 @@ malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
 
 ## 2015, 2016, 2017 reared caterpillars and parasitoids count
 allyrsreared <- read_csv("data/reared_caterpillarparasitoid_countdata_GreysonGaitoetal2021.csv") %>%
-  mutate(percappara = NoParasitoidsSBW/NoSBWReared)
+  mutate(percappara = NuParasitoidsSBW/NuSBWReared)
 
 ## 2016 malaise caught parasitoids plus 2015 reared parasitoids (that were DNA barcoded)
 ASSBW_ASBNAmetadata <- read_csv("data/malaise2016_reared2015_barcoded_metadata_GreysonGaitoetal2021.csv") %>%
@@ -124,7 +123,7 @@ ASSPP_ASSPQphy <- read.tree("data/reared1980s_barcoded_tree_GreysonGaitoetal2021
 
 ### Tests to see differences in d13C for foliage of balsam fir versus hardwoods
 malcatfoltrees<-malcatfol%>%
-  filter(FunctionalTrophicPosition=="Foliage", !TreeType=="Shrub") #shrubs were removed
+  filter(FunctionalTrophicPosition=="Foliage")
 
 ggplot(data = malcatfoltrees, aes(TreeType, d13C))+
   geom_point(aes(colour=SamplingPeriod),size=4)+
@@ -527,7 +526,7 @@ ASSPPPQses.mntd.result
 
 
 # Supporting Information --------------------------------------------------
-maldipichabund <- read_csv("data/Malaise_data/maldipich_allyears_long.csv") %>%
+maldipichabund <- read_csv("data/maldipich_allyears_long.csv") %>%
   filter(!year %in% c(84,85,88)) %>%
   filter(!Species %in% c("Agathis_males", "Agathis_females", "Apanteles_other_sp_females", "Apanteles_other_sp_males","Charmon_extensor_males","Charmon_extensor_females","Choristoneura_fumiferana_females","Choristoneura_fumiferana_males", "Itoplectis_females","Itoplectis_males","Phaeogenes_females","Phaeogenes_males", "Ephialtes_ontario_females","Ephialtes_ontario_males"))
 
@@ -594,9 +593,9 @@ ggsave("figs/maldipichabundgrp3.pdf",maldipichabundgrp3,width=10,height=7) # Fig
 
 allyrsreared %>%
   group_by(Yr, HWGrad) %>%
-  summarise(mnSBW = mean(NoSBWReared)) #Comparing number of budworm sampled each year and along hardwood gradient. Definitely differences but looks to be mostly random.
+  summarise(mnSBW = mean(NuSBWReared)) #Comparing number of budworm sampled each year and along hardwood gradient. Definitely differences but looks to be mostly random.
 
-allyrsSBWaov <- aov(NoSBWReared~HWGrad*Yr,data=allyrsreared)
+allyrsSBWaov <- aov(NuSBWReared~HWGrad*Yr,data=allyrsreared)
 
 plot(allyrsSBWaov)
 

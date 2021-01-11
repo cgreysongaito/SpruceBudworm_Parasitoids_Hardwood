@@ -38,13 +38,19 @@ Then change your working directory to this folder. You will need to change the p
 ### Folder and file structure
 
 * data
-    *  &ndash; dataset
-* figs &ndash; folder to place figures when created
+  * SI_data_GreysonGaitoetal2021.csv
+  * reared_caterpillarparasitoid_countdata_GreysonGaitoetal2021.csv
+  * malaise2016_reared2015_barcoded_metadata_GreysonGaitoetal2021.csv
+  * malaise2016_reared2015_barcoded_tree_GreysonGaitoetal2021.nwk
+  * reared1980s_barcoded_metadata_GreysonGaitoetal2021.csv
+  * reared1980s_barcoded_tree_GreysonGaitoetal2021.nwk
+* figs &ndash; folder to place figures when created 
 * .gitignore &ndash; file containing files and folders that git should ignore
-* Hardwood_SBW_GreysonGaitoetal2021_RScript.R &ndash; R script with statistical analyses and figure creation
-* LICENSE.txt &ndash; CC by 4.0 License for this repository
-* README.md &ndash; Readme file
-* SpruceBudworm_Parasitoid_Hardwood.Rproj &ndash; Opens R project
+* Hardwood_SBW_GreysonGaitoetal2021_RScript.R &ndash; R script with statistical analyses and figure creation 
+* LICENSE.txt &ndash; CC by 4.0 License for this repository 
+* README.md &ndash; Readme file 
+* SpruceBudworm_Parasitoid_Hardwood.Rproj &ndash; Opens R project 
+* metadata_SpruceBudworm_Parasitoids_Hardwood_GreysonGaitoetal2021.docx &ndash; contains information on each datafile
 
 
 
