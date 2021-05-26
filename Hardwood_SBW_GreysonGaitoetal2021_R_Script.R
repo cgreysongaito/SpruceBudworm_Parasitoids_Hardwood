@@ -43,19 +43,19 @@ library(nlme)
 # Data Input and Cleaning -----------------------------------------------------------
 
 ## 2016 malaise caught parasitoids plus 2015 reared parasitoids (that were DNA barcoded)
-ASSBW_ASBNAmetadata <- read_csv("data/ASSBW&ASBNA.csv") %>%
+ASSBW_ASBNAmetadata <- read_csv("data/malaise2016_reared2015_barcoded_metadata_GreysonGaitoetal2021.csv") %>%
   select(ProcessID, SampleID, HWGrad, Plot, Method, CONTIG, BIN)
 
-ASSBW_ASBNAphy <- read.tree("data/ASSBW&ASBNA.nwk")
+ASSBW_ASBNAphy <- read.tree("data/malaise2016_reared2015_barcoded_tree_GreysonGaitoetal2021.nwk")
 
 ## 1980s reared parasitoids (that were DNA barcoded)
-ASSPP_ASSPQmetadata <- read_csv("data/ASSPP&ASSPQ.csv") %>%
+ASSPP_ASSPQmetadata <- read_csv("data/reared1980s_barcoded_metadata_GreysonGaitoetal2021.csv") %>%
   separate(CollectionNotes, c("Plot", "Composition"), sep="_", remove=FALSE)
 
-ASSPP_ASSPQphy <- read.tree("data/ASSPP&ASSPQ.nwk")
+ASSPP_ASSPQphy <- read.tree("data/reared1980s_barcoded_tree_GreysonGaitoetal2021.nwk")
 
 ## 1980s Malaise Samples - Stable Isotope
-malcatfol <- read_csv("data/SIdataChrisGreysonGaito2017.csv")%>%
+malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
   mutate(DummyIdent=Identifier, DummyIdent=gsub(" A| B| C","",DummyIdent))%>% #remove A B C to prep for find average values of repeats of a few samples
   group_by(DummyIdent)%>% # set up averaging by group by a dummy identifier
   summarise(d13C=mean(cald13C), percentC=mean(calpercentC), d15N=mean(cald15N), percentN=mean(calpercentN), CNRatio=mean(CNratio))%>% #find the average values of the repeats of a few samples and return the same values of the other samples that did not have SI repeats
@@ -181,7 +181,7 @@ HWNMDSplot<-ggplot(HWdatascores)+
 
 HWNMDSplot
 
-ggsave("figs/nmdsHW.pdf",plot=HWNMDSplot,width=10,height=10) #Figure 1
+ggsave("figs/nmdsHW.pdf",plot=HWNMDSplot,width=10,height=10) #Figure 2
 
 
 # Testing the separation of the parasitoid communities between before, during, and after the budworm peak, using the adonis function for a permanova. - Guide to formulating the permutation structure and permutation test from the following webpage http://thebiobucket.blogspot.ca/2011/04/repeat-measure-adonis-lately-i-had-to.html#more
@@ -229,6 +229,7 @@ par(mfrow = c(1, 3))
 
 #Shows a red dot on the tips where a species is present at that site (where in community matrix it is >0)
 
+#Figure 3a
 for (i in row.names(ASSBWBINPAmatrix)) {
   plot(ASSBWprunedphy, show.tip.label = FALSE, main = i, cex.main = 3) 
   tiplabels(tip = which(ASSBWprunedphy$tip.label%in%names(which(ASSBWBINPAmatrix[i, ]  > 0))), pch = 18, cex = 1, col="red")} # Figure 3 A
@@ -248,7 +249,7 @@ ASSBWphydist <- cophenetic(ASSBWprunedphy)
 # The number of the runs is not fixed, but the standard for ses.mntd is ~999, If you need a trial then use fewer runs, ~100, so it runs faster 
 # In order to randomize community matrix we run null models. Here we chose the null model "taxa.labels" because it is the default null model to randomize all tips across all sites
 #full description with citations available at <http://picante.r-forge.r-project.org/picante-intro.pdf>
-set.seed(42); ASSBWses.mntd.result <- ses.mntd(ASSBWBINPAmatrix, ASSBWphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
+set.seed(41); ASSBWses.mntd.result <- ses.mntd(ASSBWBINPAmatrix, ASSBWphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
 
 # This will give a table of results 
 # ntaxa is the species richness per site
@@ -298,6 +299,7 @@ par(mfrow = c(1, 3))
 #Shows a red dot on the tips where a species is present at that site (where in community matrix it is >0)
 # We want no tip labels so the phylogeny is clean 
 
+# Figure 3b
 for (i in row.names(ASSPPPQBINPAmatrix)) {
   plot(ASSPPPQprunedphy, show.tip.label = FALSE, main = i, cex.main = 3) 
   tiplabels(tip = which(ASSPPPQprunedphy$tip.label%in%names(which(ASSPPPQBINPAmatrix[i, ]  > 0))), pch = 18, cex = 1, col="red")} # Figure 3 B
@@ -317,7 +319,7 @@ ASSPPPQphydist <- cophenetic(ASSPPPQprunedphy)
 # The number of the runs is not fixed, but the standard for ses.mntd is ~999, If you need a trial then use fewer runs, ~100, so it runs faster 
 # In order to randomize community matrix we run null models. Here we chose the null model "taxa.labels" because it is the default null model to randomize all tips across all sites
 #full description with citations available at <http://picante.r-forge.r-project.org/picante-intro.pdf>
-set.seed(42); ASSPPPQses.mntd.result <- ses.mntd(ASSPPPQBINPAmatrix, ASSPPPQphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
+set.seed(41); ASSPPPQses.mntd.result <- ses.mntd(ASSPPPQBINPAmatrix, ASSPPPQphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
 
 
 # This will give a table of results 
@@ -399,9 +401,11 @@ carbonparagrpplot<-ggplot(carbonparagrp)+
   facet_grid(.~ParaLabel)+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=25),
         axis.title.y=element_text(hjust=0.5, vjust=1.5), panel.spacing = unit(1, "lines"),legend.text=element_text(size=14))+
-  ylab(expression(delta*"13C"))+xlab("Year")+scale_color_viridis(name="budworm\nlarvae", breaks=c("SBWOUT","SBWGONE"),labels=c("May/June","July/August/September"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")
+  ylab(expression(delta*"13C"))+xlab("Year")+scale_color_viridis(name="Sampling\nPeriod", breaks=c("SBWOUT","SBWGONE"),labels=c("May/June","July/August/September"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")
 
-ggsave("figs/carbonparagrp.pdf",carbonparagrpplot,width=10,height=4) # Figure 1
+carbonparagrpplot
+
+ggsave("figs/carbonparagrp.pdf",carbonparagrpplot,width=10,height=4) # Figure 4
 
 
 ##Linear mixed effects models of year, time period, and d13C for all three parasitoid functional groups
@@ -516,7 +520,7 @@ gr3yeardiff<-carbonparagrp %>% #NOTE group3 or 3 denotes previous grouping. grou
 
 
 # Supporting Information --------------------------------------------------
-maldipichabund <- read_csv("data/Malaise_data/maldipich_allyears_long.csv") %>%
+maldipichabund <- read_csv("data/maldipich_allyears_long.csv") %>%  ### For access to this dataset please email Eldon Eveleigh (eldon.eveleigh@canada.ca)
   filter(!year %in% c(84,85,88)) %>%
   filter(!Species %in% c("Agathis_males", "Agathis_females", "Apanteles_other_sp_females", "Apanteles_other_sp_males","Charmon_extensor_males","Charmon_extensor_females","Choristoneura_fumiferana_females","Choristoneura_fumiferana_males", "Itoplectis_females","Itoplectis_males","Phaeogenes_females","Phaeogenes_males", "Ephialtes_ontario_females","Ephialtes_ontario_males"))
 
@@ -561,7 +565,7 @@ maldipichabundsum$Species<-gsub(" "," \n",maldipichabundsum$Species)
 sbwout <- filter(maldipichabundsum, Sampling_Period=="SBWOUT")
 sbwgone <- filter(maldipichabundsum, Sampling_Period=="SBWGONE")
 
-maldipichabundgrp1bar<-ggplot()+
+maldipichpropgrp1bar<-ggplot()+
   geom_bar(data = filter(sbwout, grp==1), aes(year - (0.175+0.04),prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   geom_bar(data = filter(sbwgone, grp==1), aes(year + (0.175+0.04) ,prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=20),
@@ -570,9 +574,11 @@ maldipichabundgrp1bar<-ggplot()+
   scale_fill_viridis(alpha = 1, begin = 0.23, end = 0.87, direction = 1, discrete = TRUE, option = "D")+
   ylab("Proportion")+xlab("Year")
 
-ggsave("figs/maldipichpropgrp1.pdf",maldipichabundgrp1bar, width=6, height=4) #Figure S1
+maldipichpropgrp1bar
 
-maldipichabundgrp2bar<-ggplot()+
+ggsave("figs/maldipichpropgrp1.pdf",maldipichpropgrp1bar, width=6, height=4) #Figure S1
+
+maldipichpropgrp2bar<-ggplot()+
   geom_bar(data = filter(sbwout, grp==2), aes(year - (0.175+0.04),prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   geom_bar(data = filter(sbwgone, grp==2), aes(year + (0.175+0.04) ,prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=20),
@@ -581,9 +587,11 @@ maldipichabundgrp2bar<-ggplot()+
   scale_fill_viridis(alpha = 1, begin = 0.23, end = 0.87, direction = 1, discrete = TRUE, option = "D")+
   ylab("Proportion")+xlab("Year")
 
-ggsave("figs/maldipichpropgrp2.pdf",maldipichabundgrp2bar, width=6.5, height=4.5) #Figure S2
+maldipichpropgrp2bar
 
-maldipichabundgrp3bar<-ggplot()+
+ggsave("figs/maldipichpropgrp2.pdf",maldipichpropgrp2bar, width=6.5, height=4.5) #Figure S2
+
+maldipichpropgrp3bar<-ggplot()+
   geom_bar(data = filter(sbwout, grp==3), aes(year - (0.175+0.04),prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   geom_bar(data = filter(sbwgone, grp==3), aes(year + (0.175+0.04) ,prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=20),
@@ -592,20 +600,6 @@ maldipichabundgrp3bar<-ggplot()+
   scale_fill_viridis(alpha = 1, begin = 0.23, end = 0.87, direction = 1, discrete = TRUE, option = "D")+
   ylab("Proportion")+xlab("Year")
 
-ggsave("figs/maldipichpropgrp3.pdf",maldipichabundgrp3bar, width=6, height=4) #Figure S3
 
-##### Extra useful information --------------
 
-allyrsreared %>%
-  group_by(Yr, HWGrad) %>%
-  summarise(mnSBW = mean(NoSBWReared)) #Comparing number of budworm sampled each year and along hardwood gradient. Definitely differences but looks to be mostly random.
-
-allyrsSBWaov <- aov(NoSBWReared~HWGrad*Yr,data=allyrsreared)
-
-plot(allyrsSBWaov)
-
-allyrsSBWaov
-summary(allyrsSBWaov)
-
-effectsize::cohens_f(allyrsSBWaov)
-pwr.2way(a = 3, b = 3, alpha = 0.05, size.A = 9, size.B = 9, f.A = 0.33, f.B = 0.08) # Power.A = 0.202
+ggsave("figs/maldipichpropgrp3.pdf",maldipichpropgrp3bar, width=6, height=4) #Figure S3

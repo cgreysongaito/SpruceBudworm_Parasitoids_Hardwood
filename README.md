@@ -1,4 +1,4 @@
-Contribution of hardwood trees to budworm &ndash; parasitoid food web dynamics
+Hardwood content impacts the parasitoid community associated with Eastern spruce budworm (Lepidoptera: Tortricidae)
 =========
 
 #### Authors
@@ -39,7 +39,6 @@ Then change your working directory to this folder. You will need to change the p
 
 * data
   * SI_data_GreysonGaitoetal2021.csv
-  * reared_caterpillarparasitoid_countdata_GreysonGaitoetal2021.csv
   * malaise2016_reared2015_barcoded_metadata_GreysonGaitoetal2021.csv
   * malaise2016_reared2015_barcoded_tree_GreysonGaitoetal2021.nwk
   * reared1980s_barcoded_metadata_GreysonGaitoetal2021.csv
