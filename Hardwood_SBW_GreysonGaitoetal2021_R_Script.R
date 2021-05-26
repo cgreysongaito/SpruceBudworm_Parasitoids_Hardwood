@@ -1,5 +1,5 @@
 ##############################
-##    Contribution of hardwood trees to budworm - parasitoid food web dynamics
+##    Hardwood content impacts the parasitoid community associated with Eastern spruce budworm (Lepidoptera: Tortricidae)
 ##
 ##  Christopher J. Greyson-Gaito, Sarah J. Dolson, Glen Forbes, Rosanna Lamb,
 ##  Wayne E. MacKinnon, Kevin S. McCann, M. Alex Smith, Eldon S. Eveleigh
@@ -38,16 +38,24 @@ library(viridis)
 library(vegan)
 library(goeveg)
 library(permute)
-library(SpadeR)
 library(nlme)
-library(pwr)
-library(pwr2)
-library(sjstats)
 
 # Data Input and Cleaning -----------------------------------------------------------
 
+## 2016 malaise caught parasitoids plus 2015 reared parasitoids (that were DNA barcoded)
+ASSBW_ASBNAmetadata <- read_csv("data/ASSBW&ASBNA.csv") %>%
+  select(ProcessID, SampleID, HWGrad, Plot, Method, CONTIG, BIN)
+
+ASSBW_ASBNAphy <- read.tree("data/ASSBW&ASBNA.nwk")
+
+## 1980s reared parasitoids (that were DNA barcoded)
+ASSPP_ASSPQmetadata <- read_csv("data/ASSPP&ASSPQ.csv") %>%
+  separate(CollectionNotes, c("Plot", "Composition"), sep="_", remove=FALSE)
+
+ASSPP_ASSPQphy <- read.tree("data/ASSPP&ASSPQ.nwk")
+
 ## 1980s Malaise Samples - Stable Isotope
-malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
+malcatfol <- read_csv("data/SIdataChrisGreysonGaito2017.csv")%>%
   mutate(DummyIdent=Identifier, DummyIdent=gsub(" A| B| C","",DummyIdent))%>% #remove A B C to prep for find average values of repeats of a few samples
   group_by(DummyIdent)%>% # set up averaging by group by a dummy identifier
   summarise(d13C=mean(cald13C), percentC=mean(calpercentC), d15N=mean(cald15N), percentN=mean(calpercentN), CNRatio=mean(CNratio))%>% #find the average values of the repeats of a few samples and return the same values of the other samples that did not have SI repeats
@@ -81,13 +89,14 @@ malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
     grepl("JULY",Identifier) | grepl("AUG",Identifier)  ~ "SBWGONE"
   )))%>%
   mutate(FunctionalTrophicPosition=as.factor(case_when(
-    grepl("BFP",Identifier) | grepl("HWP",Identifier) ~ "Foliage",
+    grepl("BFP",Identifier) | grepl("HWP",Identifier) | grepl("WRAUG",Identifier) | grepl("RHOAUG",Identifier) ~ "Foliage",
     grepl("ALT",Identifier) | grepl("SBW", Identifier) ~ "Caterpillar",
     grepl("GR", Identifier) ~ "Parasitoid"
   )))%>%
   mutate(TreeType=as.factor(case_when(
     grepl("BF", Identifier) ~ "BF",
     grepl("HW", Identifier) ~ "HW",
+    grepl("WRAUG",Identifier) | grepl("RHOAUG",Identifier) ~ "Shrub"
   )))%>%
   mutate(SBWALT=as.factor(case_when(
     grepl("SBW", Identifier) ~ "SBW",
@@ -100,30 +109,241 @@ malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
     grepl("GR05", Identifier) ~ "5"
   )))
 
-## 2015, 2016, 2017 reared caterpillars and parasitoids count
-allyrsreared <- read_csv("data/reared_caterpillarparasitoid_countdata_GreysonGaitoetal2021.csv") %>%
-  mutate(percappara = NuParasitoidsSBW/NuSBWReared)
+# Parasitoid community differences along a hardwood gradient -----------------------------
 
-## 2016 malaise caught parasitoids plus 2015 reared parasitoids (that were DNA barcoded)
-ASSBW_ASBNAmetadata <- read_csv("data/malaise2016_reared2015_barcoded_metadata_GreysonGaitoetal2021.csv") %>%
-  select(ProcessID, SampleID, HWGrad, Plot, Method, CONTIG, BIN)
+#Parasitoid community composition
+nmdsdata<-ASSBW_ASBNAmetadata %>%
+  group_by(HWGrad,Plot, BIN) %>%
+  summarise(nind=length(BIN)) %>%
+  ungroup() %>%
+  mutate(HWGrad=as.factor(HWGrad))
 
-ASSBW_ASBNAphy <- read.tree("data/malaise2016_reared2015_barcoded_tree_GreysonGaitoetal2021.nwk")
+nmdscommat<-nmdsdata%>%
+  spread(BIN,nind)%>%
+  ungroup()#creates a community matrix (but still including the factors) of the dataframe nmds
 
-## 1980s reared parasitoids (that were DNA barcoded)
-ASSPP_ASSPQmetadata <- read_csv("data/reared1980s_barcoded_metadata_GreysonGaitoetal2021.csv") %>%
-  separate(CollectionNotes, c("Plot", "Composition"), sep="_", remove=FALSE)
+factors<-tibble(
+  Plot=nmdscommat$Plot,
+  HWGrad=nmdscommat$HWGrad,
+)#creates a dataframe of the different factors that will be used in the nMDS and the PERMANOVA
 
-ASSPP_ASSPQphy <- read.tree("data/reared1980s_barcoded_tree_GreysonGaitoetal2021.nwk")
+nmdscommatfin <- nmdscommat %>%
+  select(-c(HWGrad,Plot))#removes the factors from the dataframe to create a true community matrix
+
+nmdscommatfin[is.na(nmdscommatfin)]<-0#replaces any NA values with 0. these NA values were created when the long format data was spread into a wide format dataframe and where taxa were not found for a certain Peak or Plot.
+
+dimcheckMDS(nmdscommatfin, distance = "bray", k = 6, trymax = 30, autotransform=TRUE) #after exmining screeplot from 6 dimensions to 1 dimension, chosen to use 2 dimensions because additional dimensions provide small reductions in stress
+
+set.seed(1223)
+HWNMDS <- metaMDS(nmdscommatfin, distance = "bray", k = 2, trymax = 100, autotransform=TRUE)
+
+stressplot(HWNMDS)  ##to test if distances as represented in ordination are correlated with actual distances
+
+stress10<-c(0.1594808,0.169071,0.1457156,0.2536508,0.1457156,0.1989812,0.1605333,0.1605333,0.1750966,0.2383071)
+sd(stress10)
+
+#Create nMDS plot
+HWdatascores<-as.data.frame(scores(HWNMDS))
+HWdatascores$Plot<-factors$Plot
+HWdatascores$HWGrad<-factors$HWGrad
+
+# function for creating ellipses in nmds plot
+#adapted from  http://stackoverflow.com/questions/13794419/plotting-ordiellipse-function-from-vegan-package-onto-nmds-plot-created-in-ggplo
+veganCovEllipsenew <- function (x, scale = 1, npoints = 100) 
+{
+  cov <- cov.wt(cbind(x$NMDS1,x$NMDS2),wt=rep(1/length(x$NMDS1),length(x$NMDS1)))$cov 
+  center <- c(mean(x$NMDS1),mean(x$NMDS2))
+  theta <- (0:npoints) * 2 * pi/npoints
+  Circle <- cbind(cos(theta), sin(theta))
+  HWGradunique<-unique(x$HWGrad)
+  tibble(
+    NMDS1=t(center + scale * t(Circle %*% chol(cov)))[,1],
+    NMDS2=t(center + scale * t(Circle %*% chol(cov)))[,2],
+    HWGrad=HWGradunique
+  )
+}
+
+df_ell.HWGrad<-HWdatascores%>%
+  split(.$HWGrad)%>%
+  map(veganCovEllipsenew)%>%
+  bind_rows()
+
+HWNMDSplot<-ggplot(HWdatascores)+
+  geom_point(aes(NMDS1,NMDS2, colour=HWGrad),size=5)+
+  geom_path(data=df_ell.HWGrad, aes(x=NMDS1, y=NMDS2, colour=HWGrad), size=1.5)+
+  theme(axis.title.y=element_text(hjust=0.5, vjust=1.5), 
+        legend.text=element_text(size=18),
+        legend.title=element_text(size=20),
+        legend.justification=c(1,0.99), 
+        legend.position=c(1,0.99),
+        legend.box = "horizontal")+
+  coord_fixed(ratio = 1)+scale_color_manual(name="Dominant Tree\nType", breaks=c("BFBF","BFMX","HWBF"),labels=c("Balsam Fir","Mixed","Hardwood"), values=c("#39568CFF","#1F968BFF","#B8DE29FF"))
+
+HWNMDSplot
+
+ggsave("figs/nmdsHW.pdf",plot=HWNMDSplot,width=10,height=10) #Figure 1
 
 
-# Alternating hardwood-softwood parasitoids hypothesis  --------
+# Testing the separation of the parasitoid communities between before, during, and after the budworm peak, using the adonis function for a permanova. - Guide to formulating the permutation structure and permutation test from the following webpage http://thebiobucket.blogspot.ca/2011/04/repeat-measure-adonis-lately-i-had-to.html#more
+adonis(vegdist(nmdscommatfin)~HWGrad, factors, permutations=999)
+
+
+## Phylogenetic clustering
+
+### 2010s Malaise traps
+ASSBWfinal<-ASSBW_ASBNAmetadata %>%
+  filter(Method=="Malaise") %>%
+  select(HWGrad,BIN)
+
+ASSBWBINpresenceabsence<- ASSBWfinal %>%
+  group_by(HWGrad,BIN) %>%
+  summarise(abun=length(HWGrad)) %>%
+  mutate(pa=ifelse(abun>0,1,0))%>%
+  select(-abun)%>%
+  spread(key=BIN, value=pa)%>%
+  ungroup%>%
+  select(-HWGrad)
+
+ASSBWBINpresenceabsence[is.na(ASSBWBINpresenceabsence)]<-0
+
+ASSBWBINPAmatrix<-as.matrix(ASSBWBINpresenceabsence)
+row.names(ASSBWBINPAmatrix)<-c("BFBF","BFMX","HWBF")
+
+#Picante
+
+## Making the Phylogeny for Picante
+
+# Making pruned phylogeny with the matrix version of our data
+ASSBWprunedphy <- prune.sample(ASSBWBINPAmatrix, ASSBW_ASBNAphy)
+
+# To view only 1 plot per output screen
+par(mfrow = c(1, 1))
+
+# This is to view the phylogeny that we will use for the picante analysis
+
+plot(ASSBWprunedphy)
+
+
+# To view 3 plots per output screen
+par(mfrow = c(1, 3))
+
+#Shows a red dot on the tips where a species is present at that site (where in community matrix it is >0)
+
+for (i in row.names(ASSBWBINPAmatrix)) {
+  plot(ASSBWprunedphy, show.tip.label = FALSE, main = i, cex.main = 3) 
+  tiplabels(tip = which(ASSBWprunedphy$tip.label%in%names(which(ASSBWBINPAmatrix[i, ]  > 0))), pch = 18, cex = 1, col="red")} # Figure 3 A
+
+## Species Richness & Phylogenetic Community Structure 
+
+# Calculating phylogenetic diversity across our phylogeny
+ASSBWpd.result <- pd(ASSBWBINPAmatrix, ASSBWprunedphy, include.root = FALSE)
+
+# This will give you the site names and corresponding phylogenetic diversity (PD) and the species richness (SR)
+ASSBWpd.result
+
+# phydist object is measure of distance within the phylogeny
+ASSBWphydist <- cophenetic(ASSBWprunedphy) 
+
+# This is the test to determine if any sites are phylogenetically clustered or dispersed, as well as get a general species richness count
+# The number of the runs is not fixed, but the standard for ses.mntd is ~999, If you need a trial then use fewer runs, ~100, so it runs faster 
+# In order to randomize community matrix we run null models. Here we chose the null model "taxa.labels" because it is the default null model to randomize all tips across all sites
+#full description with citations available at <http://picante.r-forge.r-project.org/picante-intro.pdf>
+set.seed(42); ASSBWses.mntd.result <- ses.mntd(ASSBWBINPAmatrix, ASSBWphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
+
+# This will give a table of results 
+# ntaxa is the species richness per site
+# mntd.obs.z is the standard effect size
+# mntd.obs.p is the p-value; <0.05 is significantly clustered, >0.95 is significantly dispersed 
+ASSBWses.mntd.result
+
+
+
+## 1980s reared parasitoids
+
+ASSPPPQfinal<-ASSPP_ASSPQmetadata %>%
+  select(Plot,BIN)
+
+ASPPPQBINpresenceabsence<- ASSPPPQfinal %>%
+  group_by(Plot,BIN) %>%
+  summarise(abun=length(Plot)) %>%
+  mutate(pa=ifelse(abun>0,1,0))%>%
+  select(-abun)%>%
+  spread(key=BIN, value=pa)%>%
+  ungroup%>%
+  select(-Plot)
+
+ASPPPQBINpresenceabsence[is.na(ASPPPQBINpresenceabsence)]<-0
+
+ASSPPPQBINPAmatrix<-as.matrix(ASPPPQBINpresenceabsence)
+row.names(ASSPPPQBINPAmatrix)<-c("Plot 1", "Plot 2", "Plot 3")
+
+#Picante
+
+## Making the Phylogeny for Picante
+
+# Making pruned phylogeny with the matrix version of our data
+ASSPPPQprunedphy <- prune.sample(ASSPPPQBINPAmatrix, ASSPP_ASSPQphy)
+
+# To view only 1 plot per output screen
+par(mfrow = c(1, 1))
+
+# This is to view the phylogeny that we will use for the picante analysis
+
+plot(ASSPPPQprunedphy)
+
+plot(ASSPP_ASSPQphy)
+# To view 3 plots per output screen
+par(mfrow = c(1, 3))
+
+#Shows a red dot on the tips where a species is present at that site (where in community matrix it is >0)
+# We want no tip labels so the phylogeny is clean 
+
+for (i in row.names(ASSPPPQBINPAmatrix)) {
+  plot(ASSPPPQprunedphy, show.tip.label = FALSE, main = i, cex.main = 3) 
+  tiplabels(tip = which(ASSPPPQprunedphy$tip.label%in%names(which(ASSPPPQBINPAmatrix[i, ]  > 0))), pch = 18, cex = 1, col="red")} # Figure 3 B
+
+## Species Richness & Phylogenetic Community Structure 
+
+# Calculating phylogenetic diversity across our phylogeny
+ASSPPPQpd.result <- pd(ASSPPPQBINPAmatrix, ASSPPPQprunedphy, include.root = FALSE)
+
+# This will give you the site names and corresponding phylogenetic diversity (PD) and the species richness (SR)
+ASSPPPQpd.result
+
+# phydist object is measure of distance within the phylogeny
+ASSPPPQphydist <- cophenetic(ASSPPPQprunedphy) 
+
+# This is the test to determine if any sites are phylogenetically clustered or dispersed, as well as get a general species richness count
+# The number of the runs is not fixed, but the standard for ses.mntd is ~999, If you need a trial then use fewer runs, ~100, so it runs faster 
+# In order to randomize community matrix we run null models. Here we chose the null model "taxa.labels" because it is the default null model to randomize all tips across all sites
+#full description with citations available at <http://picante.r-forge.r-project.org/picante-intro.pdf>
+set.seed(42); ASSPPPQses.mntd.result <- ses.mntd(ASSPPPQBINPAmatrix, ASSPPPQphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
+
+
+# This will give a table of results 
+# ntaxa is the species  richness per site
+# mntd.obs.z is the standard effect size
+# mntd.obs.p is the p-value; <0.05 is significantly clustered, >0.95 is significantly dispersed 
+ASSPPPQses.mntd.result
+
+# Parasitoid community balsam fir/hardwood trophic relationships --------
 
 ## 1980s Malaise Samples - Stable Isotope
 
+### Tests to see difference in d15N between foliage, caterpillars and parasitoids
+
+ggplot(data = malcatfol, aes(FunctionalTrophicPosition, d15N))+
+  geom_jitter(aes(colour = TreeType),size=4)+
+  theme(axis.line=element_line(colour="black"), panel.grid.minor=element_blank(), 
+        panel.grid.major=element_blank(), panel.background=element_blank(), 
+        axis.title=element_text(size=28,face="bold"), axis.title.y=element_text(hjust=0.5, vjust=1.5), 
+        axis.text.x=element_text(size=24, colour="Black"), 
+        axis.text.y=element_text(size=24, colour="Black"),axis.ticks.length=unit(0.5,"cm"),axis.ticks=element_line(size=0.5, colour="Black"),panel.border=element_rect(fill=FALSE,size=0.5)) #not a figure in the text
+
+
 ### Tests to see differences in d13C for foliage of balsam fir versus hardwoods
 malcatfoltrees<-malcatfol%>%
-  filter(FunctionalTrophicPosition=="Foliage")
+  filter(FunctionalTrophicPosition=="Foliage", !TreeType=="Shrub") #shrubs were removed
 
 ggplot(data = malcatfoltrees, aes(TreeType, d13C))+
   geom_point(aes(colour=SamplingPeriod),size=4)+
@@ -145,7 +365,7 @@ ggplot(malcatfolcaterpillar, aes(TreeType, d13C))+
 
 t.test(d13C~TreeType,malcatfolcaterpillar)
 
-# Comparison of d13C between years, time periods (budworm larvae present or absent), and functional groups
+# Comparison of d13C between years, time periods (May/June or July/August/September), and functional groups
 carbonparagroup<-function(paragrp){
   para<-malcatfol %>%
     filter(FunctionalTrophicPosition=="Parasitoid")%>%
@@ -179,7 +399,7 @@ carbonparagrpplot<-ggplot(carbonparagrp)+
   facet_grid(.~ParaLabel)+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=25),
         axis.title.y=element_text(hjust=0.5, vjust=1.5), panel.spacing = unit(1, "lines"),legend.text=element_text(size=14))+
-  ylab(expression(delta*"13C"))+xlab("Year")+scale_color_viridis(name="budworm\nlarvae", breaks=c("SBWOUT","SBWGONE"),labels=c("present","absent"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")
+  ylab(expression(delta*"13C"))+xlab("Year")+scale_color_viridis(name="budworm\nlarvae", breaks=c("SBWOUT","SBWGONE"),labels=c("May/June","July/August/September"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")
 
 ggsave("figs/carbonparagrp.pdf",carbonparagrpplot,width=10,height=4) # Figure 1
 
@@ -270,7 +490,7 @@ anova(carbonparagrpfullglsdropYRSPinteractionml,carbonparagrpfullglsdropSPPL2int
 
 carbonparagrpfinalmodelREML<-gls(meand13C~Year+SamplingPeriod+ParaLabel+Year:ParaLabel+SamplingPeriod:ParaLabel,weights=varIdent(form=~1|SamplingPeriod),data=carbonparagrp,method="REML")
 summary(carbonparagrpfinalmodelREML)
-
+anova(carbonparagrpfinalmodelREML)
 
 gr12yeardiff<-carbonparagrp %>% #NOTE group12 or 1_2 denotes previous grouping. grouping for these para in this manuscript is group 1
   filter(ParasitoidGroup=="1_2") %>%
@@ -284,7 +504,7 @@ gr12seasondiff<-carbonparagrp %>% #NOTE group12 or 1_2 denotes previous grouping
   group_by(SamplingPeriod) %>%
   summarise(Avd13C=mean(meand13C))
 
-(gr12seasondiff$Avd13C[1]/gr12seasondiff$Avd13C[2] - 1) *100 #2.4% more negative between when budworm absent and present (used in Results for Alternating hardwood-softwood parasitoids hypothesis)
+(gr12seasondiff$Avd13C[1]/gr12seasondiff$Avd13C[2] - 1) *100 #2.4% more negative between Juliy/August/September and May/June (used in Results for Alternating hardwood-softwood parasitoids hypothesis)
 
 gr3yeardiff<-carbonparagrp %>% #NOTE group3 or 3 denotes previous grouping. grouping for these para in this manuscript is group 2
   filter(ParasitoidGroup=="3") %>%
@@ -293,240 +513,10 @@ gr3yeardiff<-carbonparagrp %>% #NOTE group3 or 3 denotes previous grouping. grou
 
 (1 - ((gr3yeardiff$Avd13C[4]/gr3yeardiff$Avd13C[1]) ^ (1/3))) * 100 # 1.6% less negative each year (used in Results for Alternating hardwood-softwood parasitoids hypothesis)
 
-# Mixed stands natural enemies hypothesis -----------------------------
-
-## Parasitoid abundances 
-
-### Reared parasitoids from 2015, 2016, 2017 (per capita number of parasitoid emergences)
-
-allyrsreared %>%
-  group_by(Yr, HWGrad) %>%
-  summarise(mnpercap = mean(percappara))
-
-allyrspcaov <- aov(percappara~HWGrad*Yr,data=allyrsreared)
-
-plot(allyrspcaov)
-
-allyrspcaov
-summary(allyrspcaov)
-
-effectsize::cohens_f(allyrspcaov)
-pwr.2way(a = 3, b = 3, alpha = 0.05, size.A = 9, size.B = 9, f.A = 0.15, f.B = 1.14) # Power.A = 0.202
-
-allyrspcrearplot<-ggplot(data=allyrsreared, aes(y = percappara,x = as.factor(HWGrad), color = as.factor(Yr)))+
-  geom_point(position=position_jitterdodge(dodge.width=0.5), size = 4)+
-  scale_color_viridis(name="Year", breaks=c("2015","2016","2017"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")+
-  theme(legend.text=element_text(size=15))+
-  xlab("Forest type")+ylab("Per capita emergence")
-
-ggsave("figs/parasitoidpercapreared.pdf", allyrspcrearplot, width=7, height=5) # Figure 2A
-
-### Malaise trap caught parasitoids from 2016
-ASSBWabun <- ASSBW_ASBNAmetadata %>%
-  filter(Method=="Malaise")%>%
-  mutate(HWGrad=as.factor(HWGrad),Plot=as.factor(Plot))%>%
-  group_by(HWGrad,Plot) %>%
-  summarise(abun=length(BIN))
-
-ASSBWabunaov <- aov(abun~HWGrad,data=ASSBWabun)
-
-plot(ASSBWabunaov)
-
-HWGrad_meanpara<-ASSBWabun %>%
-  group_by(HWGrad) %>%
-  summarise(meangroup=mean(abun))
-
-((HWGrad_meanpara[2,2]+HWGrad_meanpara[3,2])/2)/HWGrad_meanpara[1,2] # para abun in mixed and hardwood stands 77% larger than in balsam fir stands - used in results Mixed stands natural enemies hypothesis, Parasitoid abundances
-
-summary(ASSBWabunaov)
-effectsize::cohens_f(ASSBWabunaov)
-pwr.anova.test(k=3, n=3, f=0.79, sig.level = 0.05)
-
-paraabunmalplot<-ggplot(data=ASSBWabun)+
-  geom_point(aes(y=abun,x=as.factor(HWGrad)), size = 4)+
-  xlab("Forest type")+ylab("Abundance")
-
-ggsave("figs/parasitoidabundancemalaise.pdf", paraabunmalplot, width=5.5, height=4.5)
-
-
-## Parasitoid richness
-
-### Malaise trap caught parasitoids from 2016
-ASSBWdnacommmatall<- ASSBW_ASBNAmetadata %>%
-  filter(Method=="Malaise") %>%
-  group_by(Plot,BIN) %>%
-  summarise(abun=length(ProcessID)) %>%
-  spread(key=BIN, value=abun)%>%
-  ungroup
-
-ASSBWdnacommmatall[is.na(ASSBWdnacommmatall)]<-0
-
-ASSBWdnacommmatallmat<-ASSBWdnacommmatall%>%
-  select(-Plot)%>%
-  as.matrix()
-
-ASSBWdnacommmatallfreq<-data.frame(t(ASSBWdnacommmatallmat))
-colnames(ASSBWdnacommmatallfreq)<-c("Plot 1","Plot 2","Plot 3","Plot 4","Plot 5","Plot 6","Plot 7","Plot 8","Plot 9")
-
-
-chao<-NULL
-for (i in 1:9){
-  chaovalue<-ChaoSpecies(ASSBWdnacommmatallfreq[i],"abundance",k=10,conf=0.95)$Species_table[3,1]
-  chao<-append(chao,chaovalue)
-}
-
-ASSBWchaospecies<-tibble(
-  Plot=c("Plot 1","Plot 2","Plot 3","Plot 4","Plot 5","Plot 6","Plot 7","Plot 8","Plot 9"),
-  HWGrad=c("BFBF","BFBF","BFBF","BFMX","BFMX","BFMX","HWBF","HWBF","HWBF"),
-  Chao=chao,
-)
-
-ASSBWchaoaov<-aov(log10(Chao)~HWGrad,ASSBWchaospecies)
-summary(ASSBWchaoaov)
-effectsize::cohens_f(ASSBWchaoaov)
-pwr.anova.test(k=3, n=3, f=0.43, sig.level = 0.05)
-
-## Phylogenetic clustering
-
-### 2010s Malaise traps
-ASSBWfinal<-ASSBW_ASBNAmetadata %>%
-  filter(Method=="Malaise") %>%
-  select(HWGrad,BIN)
-
-ASSBWBINpresenceabsence<- ASSBWfinal %>%
-  group_by(HWGrad,BIN) %>%
-  summarise(abun=length(HWGrad)) %>%
-  mutate(pa=ifelse(abun>0,1,0))%>%
-  select(-abun)%>%
-  spread(key=BIN, value=pa)%>%
-  ungroup%>%
-  select(-HWGrad)
-
-ASSBWBINpresenceabsence[is.na(ASSBWBINpresenceabsence)]<-0
-
-ASSBWBINPAmatrix<-as.matrix(ASSBWBINpresenceabsence)
-row.names(ASSBWBINPAmatrix)<-c("BFBF","BFMX","HWBF")
-
-#Picante
-
-## Making the Phylogeny for Picante
-
-# Making pruned phylogeny with the matrix version of our data
-ASSBWprunedphy <- prune.sample(ASSBWBINPAmatrix, ASSBW_ASBNAphy)
-
-# To view only 1 plot per output screen
-par(mfrow = c(1, 1))
-
-# This is to view the phylogeny that we will use for the picante analysis
-
-plot(ASSBWprunedphy)
-
-
-# To view 3 plots per output screen
-par(mfrow = c(1, 3))
-
-#Shows a red dot on the tips where a species is present at that site (where in community matrix it is >0)
-
-for (i in row.names(ASSBWBINPAmatrix)) {
-  plot(ASSBWprunedphy, show.tip.label = FALSE, main = i, cex.main = 3) 
-  tiplabels(tip = which(ASSBWprunedphy$tip.label%in%names(which(ASSBWBINPAmatrix[i, ]  > 0))), pch = 18, cex = 2, col="red")} # Figure 3 A
-
-## Species Richness & Phylogenetic Community Structure 
-
-# Calculating phylogenetic diversity across our phylogeny
-ASSBWpd.result <- pd(ASSBWBINPAmatrix, ASSBWprunedphy, include.root = FALSE)
-
-# This will give you the site names and corresponding phylogenetic diversity (PD) and the species richness (SR)
-ASSBWpd.result
-
-# phydist object is measure of distance within the phylogeny
-ASSBWphydist <- cophenetic(ASSBWprunedphy) 
-
-# This is the test to determine if any sites are phylogenetically clustered or dispersed, as well as get a general species richness count
-# The number of the runs is not fixed, but the standard for ses.mntd is ~999, If you need a trial then use fewer runs, ~100, so it runs faster 
-# In order to randomize community matrix we run null models. Here we chose the null model "taxa.labels" because it is the default null model to randomize all tips across all sites
-#full description with citations available at <http://picante.r-forge.r-project.org/picante-intro.pdf>
-set.seed(42); ASSBWses.mntd.result <- ses.mntd(ASSBWBINPAmatrix, ASSBWphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
-
-# This will give a table of results 
-# ntaxa is the species richness per site
-# mntd.obs.z is the standard effect size
-# mntd.obs.p is the p-value; <0.05 is significantly clustered, >0.95 is significantly dispersed 
-ASSBWses.mntd.result
-
-
-
-## 1980s reared parasitoids
-
-ASSPPPQfinal<-ASSPP_ASSPQmetadata %>%
-  select(Plot,BIN)
-
-ASPPPQBINpresenceabsence<- ASSPPPQfinal %>%
-  group_by(Plot,BIN) %>%
-  summarise(abun=length(Plot)) %>%
-  mutate(pa=ifelse(abun>0,1,0))%>%
-  select(-abun)%>%
-  spread(key=BIN, value=pa)%>%
-  ungroup%>%
-  select(-Plot)
-
-ASPPPQBINpresenceabsence[is.na(ASPPPQBINpresenceabsence)]<-0
-
-ASSPPPQBINPAmatrix<-as.matrix(ASPPPQBINpresenceabsence)
-row.names(ASSPPPQBINPAmatrix)<-c("Plot 1", "Plot 2", "Plot 3")
-
-#Picante
-
-## Making the Phylogeny for Picante
-
-# Making pruned phylogeny with the matrix version of our data
-ASSPPPQprunedphy <- prune.sample(ASSPPPQBINPAmatrix, ASSPP_ASSPQphy)
-
-# To view only 1 plot per output screen
-par(mfrow = c(1, 1))
-
-# This is to view the phylogeny that we will use for the picante analysis
-
-plot(ASSPPPQprunedphy)
-
-plot(ASSPP_ASSPQphy)
-# To view 3 plots per output screen
-par(mfrow = c(1, 3))
-
-#Shows a red dot on the tips where a species is present at that site (where in community matrix it is >0)
-# We want no tip labels so the phylogeny is clean 
-
-for (i in row.names(ASSPPPQBINPAmatrix)) {
-  plot(ASSPPPQprunedphy, show.tip.label = FALSE, main = i, cex.main = 3) 
-  tiplabels(tip = which(ASSPPPQprunedphy$tip.label%in%names(which(ASSPPPQBINPAmatrix[i, ]  > 0))), pch = 18, cex = 2, col="red")} # Figure 3 B
-
-## Species Richness & Phylogenetic Community Structure 
-
-# Calculating phylogenetic diversity across our phylogeny
-ASSPPPQpd.result <- pd(ASSPPPQBINPAmatrix, ASSPPPQprunedphy, include.root = FALSE)
-
-# This will give you the site names and corresponding phylogenetic diversity (PD) and the species richness (SR)
-ASSPPPQpd.result
-
-# phydist object is measure of distance within the phylogeny
-ASSPPPQphydist <- cophenetic(ASSPPPQprunedphy) 
-
-# This is the test to determine if any sites are phylogenetically clustered or dispersed, as well as get a general species richness count
-# The number of the runs is not fixed, but the standard for ses.mntd is ~999, If you need a trial then use fewer runs, ~100, so it runs faster 
-# In order to randomize community matrix we run null models. Here we chose the null model "taxa.labels" because it is the default null model to randomize all tips across all sites
-#full description with citations available at <http://picante.r-forge.r-project.org/picante-intro.pdf>
-set.seed(42); ASSPPPQses.mntd.result <- ses.mntd(ASSPPPQBINPAmatrix, ASSPPPQphydist, null.model = "taxa.labels", abundance.weighted = FALSE, runs = 999) 
-
-
-# This will give a table of results 
-# ntaxa is the species  richness per site
-# mntd.obs.z is the standard effect size
-# mntd.obs.p is the p-value; <0.05 is significantly clustered, >0.95 is significantly dispersed 
-ASSPPPQses.mntd.result
 
 
 # Supporting Information --------------------------------------------------
-maldipichabund <- read_csv("data/maldipich_allyears_long.csv") %>%
+maldipichabund <- read_csv("data/Malaise_data/maldipich_allyears_long.csv") %>%
   filter(!year %in% c(84,85,88)) %>%
   filter(!Species %in% c("Agathis_males", "Agathis_females", "Apanteles_other_sp_females", "Apanteles_other_sp_males","Charmon_extensor_males","Charmon_extensor_females","Choristoneura_fumiferana_females","Choristoneura_fumiferana_males", "Itoplectis_females","Itoplectis_males","Phaeogenes_females","Phaeogenes_males", "Ephialtes_ontario_females","Ephialtes_ontario_males"))
 
@@ -543,59 +533,74 @@ maldipichabund$Species <- gsub("Hemistermia","Hemisturmia",maldipichabund$Specie
 maldipichabund$Species <- gsub("_"," ",maldipichabund$Species)
 
 # 1980s Malaise Samples - Community Analysis
+
+maldipichabundtotal <- maldipichabund %>%
+  mutate(Sampling_Period=ifelse(collection_date<182,"SBWOUT","SBWGONE"), grp=case_when(
+    Species %in% c("Apanteles fumiferanae", "Glypta fumiferanae", "Smidtia fumiferanae","Lypha fumipennis") ~ 1,
+    Species %in% c("Actia interrupta", "Eumea caesar", "Sarcophaga aldrichi","Nilea erecta","Hemisturmia parva","Agria affinis","Compsilura concinnata", "Tachinomyia nigricans") ~ 2,
+    Species %in% c("Meteorus trachynotus", "Ceromasia auricaudata", "Nemorilla pyste","Phryxe pecosensis","Madremyia saundersii","Tranosema rostrale") ~ 3
+  ))%>%
+  group_by(year, grp, Sampling_Period)%>%
+  summarise(total=sum(Number, na.rm = TRUE))
+  
+
 maldipichabundsum <- maldipichabund %>%
   mutate(Sampling_Period=ifelse(collection_date<182,"SBWOUT","SBWGONE"))%>%
   group_by(year, Sampling_Period,Species)%>%
-  summarise(abund=sum(Number)) %>%
+  summarise(abund=sum(Number, na.rm = TRUE)) %>%
   mutate(abund=ifelse(is.na(abund),0,abund),grp=case_when(
     Species %in% c("Apanteles fumiferanae", "Glypta fumiferanae", "Smidtia fumiferanae","Lypha fumipennis") ~ 1,
     Species %in% c("Actia interrupta", "Eumea caesar", "Sarcophaga aldrichi","Nilea erecta","Hemisturmia parva","Agria affinis","Compsilura concinnata", "Tachinomyia nigricans") ~ 2,
     Species %in% c("Meteorus trachynotus", "Ceromasia auricaudata", "Nemorilla pyste","Phryxe pecosensis","Madremyia saundersii","Tranosema rostrale") ~ 3
-    
-  ))
+  ))%>%
+  left_join(maldipichabundtotal, by = c("year", "grp", "Sampling_Period")) %>%
+  mutate(prop = abund/total)
 
 maldipichabundsum$Species<-gsub(" "," \n",maldipichabundsum$Species)
 
-maldipichabundgrp1<-ggplot(filter(maldipichabundsum,grp==1))+
-  geom_jitter(aes(year,abund,colour=Sampling_Period),size=5,width=0.15,height=0)+
-  facet_wrap(~Species,nrow=2,ncol=2)+
+sbwout <- filter(maldipichabundsum, Sampling_Period=="SBWOUT")
+sbwgone <- filter(maldipichabundsum, Sampling_Period=="SBWGONE")
+
+maldipichabundgrp1bar<-ggplot()+
+  geom_bar(data = filter(sbwout, grp==1), aes(year - (0.175+0.04),prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
+  geom_bar(data = filter(sbwgone, grp==1), aes(year + (0.175+0.04) ,prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=20),
         axis.title.y=element_text(hjust=0.5, vjust=1.5), panel.spacing = unit(1, "lines"),legend.text=element_text(size=14))+
-  scale_color_viridis(name="spruce\nbudworm", breaks=c("SBWOUT","SBWGONE"),labels=c("present","absent"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")+
   scale_x_continuous(breaks=c(82,83,84,85,86,87))+
-  ylab("Abundance")+xlab("Year")
+  scale_fill_viridis(alpha = 1, begin = 0.23, end = 0.87, direction = 1, discrete = TRUE, option = "D")+
+  ylab("Proportion")+xlab("Year")
 
-ggsave("figs/maldipichabundgrp1.pdf",maldipichabundgrp1,width=10,height=7) #Figure S1
+ggsave("figs/maldipichpropgrp1.pdf",maldipichabundgrp1bar, width=6, height=4) #Figure S1
 
-maldipichabundgrp2<-ggplot(filter(maldipichabundsum,grp==2))+
-  geom_jitter(aes(year,abund,colour=Sampling_Period),size=5,width=0.15,height=0)+
-  facet_wrap(~Species,nrow=3,ncol=3)+
+maldipichabundgrp2bar<-ggplot()+
+  geom_bar(data = filter(sbwout, grp==2), aes(year - (0.175+0.04),prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
+  geom_bar(data = filter(sbwgone, grp==2), aes(year + (0.175+0.04) ,prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=20),
         axis.title.y=element_text(hjust=0.5, vjust=1.5), panel.spacing = unit(1, "lines"),legend.text=element_text(size=14))+
-  scale_color_viridis(name="spruce\nbudworm", breaks=c("SBWOUT","SBWGONE"),labels=c("present","absent"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")+
   scale_x_continuous(breaks=c(82,83,84,85,86,87))+
-  ylab("Abundance")+xlab("Year")
+  scale_fill_viridis(alpha = 1, begin = 0.23, end = 0.87, direction = 1, discrete = TRUE, option = "D")+
+  ylab("Proportion")+xlab("Year")
 
-ggsave("figs/maldipichabundgrp2.pdf",maldipichabundgrp2,width=10,height=7) # Figure S2
+ggsave("figs/maldipichpropgrp2.pdf",maldipichabundgrp2bar, width=6.5, height=4.5) #Figure S2
 
-maldipichabundgrp3<-ggplot(filter(maldipichabundsum,grp==3))+
-  geom_jitter(aes(year,abund,colour=Sampling_Period),size=5,width=0.15,height=0)+
-  facet_wrap(~Species,nrow=2,ncol=3)+
+maldipichabundgrp3bar<-ggplot()+
+  geom_bar(data = filter(sbwout, grp==3), aes(year - (0.175+0.04),prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
+  geom_bar(data = filter(sbwgone, grp==3), aes(year + (0.175+0.04) ,prop,fill = Species), position="stack", stat="identity", width = 0.35, colour="black")+
   theme(strip.background=element_blank(),strip.text.x=element_text(size=20),
         axis.title.y=element_text(hjust=0.5, vjust=1.5), panel.spacing = unit(1, "lines"),legend.text=element_text(size=14))+
-  scale_color_viridis(name="spruce\nbudworm", breaks=c("SBWOUT","SBWGONE"),labels=c("present","absent"), alpha = 1, begin = 0, end = 1, direction = 1, discrete = TRUE, option = "D")+
   scale_x_continuous(breaks=c(82,83,84,85,86,87))+
-  ylab("Abundance")+xlab("Year")
+  scale_fill_viridis(alpha = 1, begin = 0.23, end = 0.87, direction = 1, discrete = TRUE, option = "D")+
+  ylab("Proportion")+xlab("Year")
 
-ggsave("figs/maldipichabundgrp3.pdf",maldipichabundgrp3,width=10,height=7) # Figure S3
+ggsave("figs/maldipichpropgrp3.pdf",maldipichabundgrp3bar, width=6, height=4) #Figure S3
 
 ##### Extra useful information --------------
 
 allyrsreared %>%
   group_by(Yr, HWGrad) %>%
-  summarise(mnSBW = mean(NuSBWReared)) #Comparing number of budworm sampled each year and along hardwood gradient. Definitely differences but looks to be mostly random.
+  summarise(mnSBW = mean(NoSBWReared)) #Comparing number of budworm sampled each year and along hardwood gradient. Definitely differences but looks to be mostly random.
 
-allyrsSBWaov <- aov(NuSBWReared~HWGrad*Yr,data=allyrsreared)
+allyrsSBWaov <- aov(NoSBWReared~HWGrad*Yr,data=allyrsreared)
 
 plot(allyrsSBWaov)
 
