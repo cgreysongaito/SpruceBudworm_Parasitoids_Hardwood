@@ -1,5 +1,5 @@
 ##############################
-##    Hardwood content impacts the parasitoid community associated with Eastern spruce budworm (Lepidoptera: Tortricidae)
+##    Phylogenetic community structure and stable isotope analysis of the parasitoid community associated with Eastern spruce budworm (Lepidoptera: Tortricidae)
 ##
 ##  Christopher J. Greyson-Gaito, Sarah J. Dolson, Glen Forbes, Rosanna Lamb,
 ##  Wayne E. MacKinnon, Kevin S. McCann, M. Alex Smith, Eldon S. Eveleigh
@@ -109,86 +109,7 @@ malcatfol <- read_csv("data/SI_data_GreysonGaitoetal2021.csv")%>%
     grepl("GR05", Identifier) ~ "5"
   )))
 
-# Parasitoid community differences along a hardwood gradient -----------------------------
-
-#Parasitoid community composition
-nmdsdata<-ASSBW_ASBNAmetadata %>%
-  group_by(HWGrad,Plot, BIN) %>%
-  summarise(nind=length(BIN)) %>%
-  ungroup() %>%
-  mutate(HWGrad=as.factor(HWGrad))
-
-nmdscommat<-nmdsdata%>%
-  spread(BIN,nind)%>%
-  ungroup()#creates a community matrix (but still including the factors) of the dataframe nmds
-
-factors<-tibble(
-  Plot=nmdscommat$Plot,
-  HWGrad=nmdscommat$HWGrad,
-)#creates a dataframe of the different factors that will be used in the nMDS and the PERMANOVA
-
-nmdscommatfin <- nmdscommat %>%
-  select(-c(HWGrad,Plot))#removes the factors from the dataframe to create a true community matrix
-
-nmdscommatfin[is.na(nmdscommatfin)]<-0#replaces any NA values with 0. these NA values were created when the long format data was spread into a wide format dataframe and where taxa were not found for a certain Peak or Plot.
-
-dimcheckMDS(nmdscommatfin, distance = "bray", k = 6, trymax = 30, autotransform=TRUE) #after exmining screeplot from 6 dimensions to 1 dimension, chosen to use 2 dimensions because additional dimensions provide small reductions in stress
-
-set.seed(1223)
-HWNMDS <- metaMDS(nmdscommatfin, distance = "bray", k = 2, trymax = 100, autotransform=TRUE)
-
-stressplot(HWNMDS)  ##to test if distances as represented in ordination are correlated with actual distances
-
-stress10<-c(0.1594808,0.169071,0.1457156,0.2536508,0.1457156,0.1989812,0.1605333,0.1605333,0.1750966,0.2383071)
-sd(stress10)
-
-#Create nMDS plot
-HWdatascores<-as.data.frame(scores(HWNMDS))
-HWdatascores$Plot<-factors$Plot
-HWdatascores$HWGrad<-factors$HWGrad
-
-# function for creating ellipses in nmds plot
-#adapted from  http://stackoverflow.com/questions/13794419/plotting-ordiellipse-function-from-vegan-package-onto-nmds-plot-created-in-ggplo
-veganCovEllipsenew <- function (x, scale = 1, npoints = 100) 
-{
-  cov <- cov.wt(cbind(x$NMDS1,x$NMDS2),wt=rep(1/length(x$NMDS1),length(x$NMDS1)))$cov 
-  center <- c(mean(x$NMDS1),mean(x$NMDS2))
-  theta <- (0:npoints) * 2 * pi/npoints
-  Circle <- cbind(cos(theta), sin(theta))
-  HWGradunique<-unique(x$HWGrad)
-  tibble(
-    NMDS1=t(center + scale * t(Circle %*% chol(cov)))[,1],
-    NMDS2=t(center + scale * t(Circle %*% chol(cov)))[,2],
-    HWGrad=HWGradunique
-  )
-}
-
-df_ell.HWGrad<-HWdatascores%>%
-  split(.$HWGrad)%>%
-  map(veganCovEllipsenew)%>%
-  bind_rows()
-
-HWNMDSplot<-ggplot(HWdatascores)+
-  geom_point(aes(NMDS1,NMDS2, colour=HWGrad),size=5)+
-  geom_path(data=df_ell.HWGrad, aes(x=NMDS1, y=NMDS2, colour=HWGrad), size=1.5)+
-  theme(axis.title.y=element_text(hjust=0.5, vjust=1.5), 
-        legend.text=element_text(size=18),
-        legend.title=element_text(size=20),
-        legend.justification=c(1,0.99), 
-        legend.position=c(1,0.99),
-        legend.box = "horizontal")+
-  coord_fixed(ratio = 1)+scale_color_manual(name="Dominant Tree\nType", breaks=c("BFBF","BFMX","HWBF"),labels=c("Balsam Fir","Mixed","Hardwood"), values=c("#39568CFF","#1F968BFF","#B8DE29FF"))
-
-HWNMDSplot
-
-ggsave("figs/nmdsHW.pdf",plot=HWNMDSplot,width=10,height=10) #Figure 2
-
-
-# Testing the separation of the parasitoid communities between before, during, and after the budworm peak, using the adonis function for a permanova. - Guide to formulating the permutation structure and permutation test from the following webpage http://thebiobucket.blogspot.ca/2011/04/repeat-measure-adonis-lately-i-had-to.html#more
-adonis(vegdist(nmdscommatfin)~HWGrad, factors, permutations=999)
-
-
-## Phylogenetic clustering
+# Phylogenetic community structure along a hardwood gradient -----------------------------
 
 ### 2010s Malaise traps
 ASSBWfinal<-ASSBW_ASBNAmetadata %>%
@@ -328,7 +249,7 @@ set.seed(41); ASSPPPQses.mntd.result <- ses.mntd(ASSPPPQBINPAmatrix, ASSPPPQphyd
 # mntd.obs.p is the p-value; <0.05 is significantly clustered, >0.95 is significantly dispersed 
 ASSPPPQses.mntd.result
 
-# Parasitoid community balsam fir/hardwood trophic relationships --------
+# Stable isotope analysis of parasitoid community trophic relationships --------
 
 ## 1980s Malaise Samples - Stable Isotope
 

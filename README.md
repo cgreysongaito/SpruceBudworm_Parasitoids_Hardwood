@@ -1,4 +1,4 @@
-Hardwood content impacts the parasitoid community associated with Eastern spruce budworm (Lepidoptera: Tortricidae)
+Phylogenetic community structure and stable isotope analysis of the parasitoid community associated with Eastern spruce budworm (Lepidoptera: Tortricidae)
 =========
 
 #### Authors
